@@ -1,0 +1,36 @@
+name: Build BadPotato EXE
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+  workflow_dispatch:  # 手动触发编译
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 MSBuild
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: 恢复 NuGet 包
+        run: nuget restore BadPotato.csproj
+
+      - name: 编译项目（Release 模式）
+        run: msbuild BadPotato.csproj /p:Configuration=Release /p:Platform=AnyCPU
+
+      - name: 上传编译产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: BadPotato-Release
+          path: ./bin/Release/BadPotato.exe
+          
+      - name: 上传全部 Release 文件夹
+        uses: actions/upload-artifact@v4
+        with:
+          name: BadPotato-Release-Full
+          path: ./bin/Release/
