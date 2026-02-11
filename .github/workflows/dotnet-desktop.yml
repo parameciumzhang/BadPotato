@@ -3,7 +3,7 @@ name: Build BadPotato
 on:
   push:
     branches: [ master, main ]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,17 +13,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ===== 调试：先看看仓库里到底有什么文件 =====
+      - name: List all files
+        run: |
+          echo "===== 根目录文件 ====="
+          dir
+          echo ""
+          echo "===== 查找所有 .sln 文件 ====="
+          dir /s /b *.sln
+          echo ""
+          echo "===== 查找所有 .csproj 文件 ====="
+          dir /s /b *.csproj
+        shell: cmd
+
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v2
 
-      - name: Restore NuGet packages
-        run: nuget restore BadPotato.sln
-
-      - name: Build (Release)
-        run: msbuild BadPotato.sln /p:Configuration=Release /p:Platform="Any CPU"
+      # ===== 根据实际找到的文件来编译 =====
+      # 情况1：如果找到了 .sln 文件（替换为实际文件名）
+      - name: Find and Build
+        run: |
+          $sln = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
+          if ($sln) {
+            echo "找到解决方案文件: $($sln.FullName)"
+            nuget restore $sln.FullName
+            msbuild $sln.FullName /p:Configuration=Release /p:Platform="Any CPU"
+          } else {
+            echo "未找到 .sln，尝试查找 .csproj"
+            $csproj = Get-ChildItem -Recurse -Filter *.csproj | Select-Object -First 1
+            if ($csproj) {
+              echo "找到项目文件: $($csproj.FullName)"
+              nuget restore $csproj.FullName
+              msbuild $csproj.FullName /p:Configuration=Release /p:Platform="AnyCPU"
+            } else {
+              echo "::error::未找到任何 .sln 或 .csproj 文件！"
+              exit 1
+            }
+          }
+        shell: pwsh
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
