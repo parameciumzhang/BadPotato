@@ -13,52 +13,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ===== 调试：先看看仓库里到底有什么文件 =====
-      - name: List all files
-        run: |
-          echo "===== 根目录文件 ====="
-          dir
-          echo ""
-          echo "===== 查找所有 .sln 文件 ====="
-          dir /s /b *.sln
-          echo ""
-          echo "===== 查找所有 .csproj 文件 ====="
-          dir /s /b *.csproj
-        shell: cmd
-
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
-
-      # ===== 根据实际找到的文件来编译 =====
-      # 情况1：如果找到了 .sln 文件（替换为实际文件名）
-      - name: Find and Build
+      # ===== 关键修复：将目标框架改为 4.6.2（runner 上已有） =====
+      - name: Retarget to .NET Framework 4.6.2
         run: |
-          $sln = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
-          if ($sln) {
-            echo "找到解决方案文件: $($sln.FullName)"
-            nuget restore $sln.FullName
-            msbuild $sln.FullName /p:Configuration=Release /p:Platform="Any CPU"
-          } else {
-            echo "未找到 .sln，尝试查找 .csproj"
-            $csproj = Get-ChildItem -Recurse -Filter *.csproj | Select-Object -First 1
-            if ($csproj) {
-              echo "找到项目文件: $($csproj.FullName)"
-              nuget restore $csproj.FullName
-              msbuild $csproj.FullName /p:Configuration=Release /p:Platform="AnyCPU"
-            } else {
-              echo "::error::未找到任何 .sln 或 .csproj 文件！"
-              exit 1
-            }
-          }
+          $csproj = "BadPotato.csproj"
+          $content = Get-Content $csproj -Raw
+          
+          # 替换目标框架版本 v4.0 -> v4.6.2
+          $content = $content -replace '<TargetFrameworkVersion>v4\.0</TargetFrameworkVersion>', '<TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>'
+          
+          Set-Content $csproj $content
+          
+          echo "修改后的目标框架："
+          Select-String -Path $csproj -Pattern "TargetFrameworkVersion"
+        shell: pwsh
+
+      - name: Build (Release)
+        run: |
+          msbuild BadPotato.csproj /p:Configuration=Release /p:Platform=AnyCPU
+        shell: pwsh
+
+      - name: List output files
+        run: |
+          echo "===== 编译输出 ====="
+          Get-ChildItem -Recurse -Path bin/Release
         shell: pwsh
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BadPotato
+          name: BadPotato-Release
           path: |
             **/bin/Release/**/*.exe
             **/bin/Release/**/*.dll
