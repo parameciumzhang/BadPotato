@@ -3,31 +3,27 @@ name: Build BadPotato
 on:
   push:
     branches: [ master, main ]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest  # C# .NET Framework 必须用 Windows
+    runs-on: windows-latest
 
     steps:
-    # 1. 检出代码
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. 设置 MSBuild 路径
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
-    # 3. 还原 NuGet 包（如果有的话）
     - name: Restore NuGet packages
       run: nuget restore BadPotato.csproj
       continue-on-error: true
 
-    # 4. 编译项目（Release 模式）
+    # ✅ 关键修改在这里
     - name: Build
-      run: msbuild BadPotato.csproj /p:Configuration=Release /p:Platform="Any CPU"
+      run: msbuild BadPotato.csproj /p:Configuration=Release /p:Platform=AnyCPU
 
-    # 5. 上传编译产物
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
