@@ -1,42 +1,43 @@
 name: Build BadPotato
 
+# 触发条件：推送到 master/main 分支，或手动触发
 on:
   push:
-    branches: [ master, main ]
-  workflow_dispatch:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_dispatch: # 允许在 Action 页面手动点击按钮运行
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-latest  # 使用 Windows 环境
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    # 1. 拉取代码
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+    # 2. 设置 MSBuild 环境 (用于编译 .NET Framework 项目)
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.1
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
+    # 3. 设置 NuGet (如果项目有依赖包需要还原)
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1.2
 
-      # 用 NuGet 包提供 .NET 4.0 引用程序集
-      - name: Install .NET Framework 4.0 Reference Assemblies
-        run: |
-          nuget install Microsoft.NETFramework.ReferenceAssemblies.net40 -Version 1.0.3 -OutputDirectory packages
-        shell: cmd
+    # 4. 还原 NuGet 包
+    - name: Restore NuGet packages
+      run: nuget restore BadPotato.csproj
 
-      - name: Build with Reference Assemblies
-        run: |
-          msbuild BadPotato.csproj ^
-            /p:Configuration=Release ^
-            /p:Platform=AnyCPU ^
-            /p:FrameworkPathOverride="%CD%\packages\Microsoft.NETFramework.ReferenceAssemblies.net40.1.0.3\build\.NETFramework\v4.0"
-        shell: cmd
+    # 5. 执行编译 (Release 模式)
+    - name: Build Solution
+      run: msbuild BadPotato.csproj /p:Configuration=Release /p:Platform="Any CPU"
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: BadPotato-Release
-          path: |
-            **/bin/Release/**/*.exe
-            **/bin/Release/**/*.dll
+    # 6. 上传编译好的 exe 文件
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: BadPotato-Release
+        # 通常编译后的文件在 bin/Release 目录下
+        path: bin/Release/*.exe
+        if-no-files-found: error
