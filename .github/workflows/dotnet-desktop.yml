@@ -1,40 +1,42 @@
-name: Build BadPotato Fix
+name: Build BadPotato
 
 on:
-  workflow_dispatch:
   push:
     branches: [ master, main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v2
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
 
-    - name: Restore NuGet packages
-      run: |
-        # 查找 .sln 或 .csproj 并还原依赖
-        Get-ChildItem -Recurse -Filter *.csproj | ForEach-Object {
-            nuget restore $_.FullName
-        }
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
 
-    - name: Build Solution (Force .NET 4.8)
-      run: |
-        # 强制使用 .NET 4.8 进行编译，解决找不到 v4.0 的问题
-        Get-ChildItem -Recurse -Filter *.csproj | ForEach-Object {
-            echo "Building: $($_.FullName)"
-            msbuild $_.FullName /p:Configuration=Release /p:Platform="Any CPU" /p:TargetFrameworkVersion=v4.8
-        }
+      # 用 NuGet 包提供 .NET 4.0 引用程序集
+      - name: Install .NET Framework 4.0 Reference Assemblies
+        run: |
+          nuget install Microsoft.NETFramework.ReferenceAssemblies.net40 -Version 1.0.3 -OutputDirectory packages
+        shell: cmd
 
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: BadPotato-Exe
-        path: |
-          **/bin/Release/*.exe
-        retention-days: 1
+      - name: Build with Reference Assemblies
+        run: |
+          msbuild BadPotato.csproj ^
+            /p:Configuration=Release ^
+            /p:Platform=AnyCPU ^
+            /p:FrameworkPathOverride="%CD%\packages\Microsoft.NETFramework.ReferenceAssemblies.net40.1.0.3\build\.NETFramework\v4.0"
+        shell: cmd
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BadPotato-Release
+          path: |
+            **/bin/Release/**/*.exe
+            **/bin/Release/**/*.dll
