@@ -1,43 +1,46 @@
 name: Build BadPotato
 
-# 触发条件：推送到 master/main 分支，或手动触发
+# 触发条件：推送到主分支或手动触发
 on:
   push:
-    branches: [ "master", "main" ]
-  pull_request:
-    branches: [ "master", "main" ]
-  workflow_dispatch: # 允许在 Action 页面手动点击按钮运行
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest  # 使用 Windows 环境
+    # 必须使用 Windows 环境来编译 .NET Framework 项目
+    runs-on: windows-latest
 
     steps:
-    # 1. 拉取代码
+    # 1. 检出代码
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. 设置 MSBuild 环境 (用于编译 .NET Framework 项目)
+    # 2. 设置 MSBuild 环境
     - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1.1
+      uses: microsoft/setup-msbuild@v1.3
 
-    # 3. 设置 NuGet (如果项目有依赖包需要还原)
+    # 3. 设置 NuGet (用于下载依赖包，如果有的话)
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v1.2
 
-    # 4. 还原 NuGet 包
+    # 4. 还原依赖项
     - name: Restore NuGet packages
       run: nuget restore BadPotato.csproj
 
-    # 5. 执行编译 (Release 模式)
+    # 5. 执行编译
+    # /p:Configuration=Release 表示编译发布版（体积更小，无调试信息）
+    # /p:Platform="Any CPU" 表示兼容所有CPU架构
     - name: Build Solution
       run: msbuild BadPotato.csproj /p:Configuration=Release /p:Platform="Any CPU"
 
-    # 6. 上传编译好的 exe 文件
+    # 6. 上传编译结果
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: BadPotato-Release
-        # 通常编译后的文件在 bin/Release 目录下
-        path: bin/Release/*.exe
-        if-no-files-found: error
+        name: BadPotato-Build
+        # 指定上传的路径，通常生成在 bin/Release 目录下
+        path: |
+          bin/Release/*.exe
+          bin/Release/*.dll
+          bin/Release/*.config
